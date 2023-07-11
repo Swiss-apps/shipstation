@@ -86,7 +86,9 @@ module Shipstation
                                 headers: headers
                               }).execute do |response, request, result|
         str_response = response.to_str
-        str_response.blank? ? '' : JSON.parse(str_response)
+
+        response = result.code == '200' ? JSON.parse(str_response) : { message: result.message }
+        response.merge(code: result.code).with_indifferent_access
       end
     end
 
