@@ -11,14 +11,12 @@ require 'shipstation/api_operations/delete'
 require 'shipstation/api_resource'
 require 'shipstation/order'
 require 'shipstation/customer'
-require 'shipstation/fulfillment'
 require 'shipstation/shipment'
 require 'shipstation/carrier'
 require 'shipstation/store'
 require 'shipstation/warehouse'
 require 'shipstation/product'
 require 'shipstation/tag'
-require 'shipstation/webhook'
 
 module Shipstation
 
@@ -59,10 +57,14 @@ module Shipstation
     attr_writer :password
 
     def request method, resource, params = {}
-      ss_username = params[:username] || Shipstation.username
-      ss_password = params[:password] || Shipstation.password
+      if params.is_a?(Hash)
+        ss_username = params.delete(:username)
+        ss_password = params.delete(:password)
+        params = params[:input] if params[:input]
+      end
 
-      params.except!(:username, :password)
+      ss_username ||= Shipstation.username
+      ss_password ||= Shipstation.password
 
       defined? method or raise(
         ArgumentError, "Request method has not been specified"
@@ -85,10 +87,15 @@ module Shipstation
                                 payload: payload ? payload.to_json : nil,
                                 headers: headers
                               }).execute do |response, request, result|
+        if response.code != 200
+          raise ApiRequestError.new(
+            response_code: response.code,
+            response_headers: response.headers,
+            response_body: response.to_str
+          )
+        end
         str_response = response.to_str
-
-        response = result.code == '200' ? JSON.parse(str_response) : { message: result.message }
-        response.merge(code: result.code).with_indifferent_access
+        str_response.empty? ? '' : JSON.parse(str_response)
       end
     end
 
